@@ -39,7 +39,6 @@ def get_weather_data(location):
 
         df = pd.DataFrame(weather_list)
         df['Datetime'] = pd.to_datetime(df['Datetime'])
-
         return df
 
     except:
@@ -78,20 +77,20 @@ def get_theme(desc, hour):
 
     if "rain" in desc:
         gradient = "#00c6ff, #0072ff"
-        card = "rgba(0,114,255,0.2)"
+        card = "rgba(0,114,255,0.25)"
     elif "cloud" in desc:
         gradient = "#757f9a, #d7dde8"
-        card = "rgba(120,120,120,0.2)"
+        card = "rgba(120,120,120,0.25)"
     elif "clear" in desc:
         gradient = "#f7971e, #ffd200"
-        card = "rgba(255,200,0,0.2)"
+        card = "rgba(255,200,0,0.25)"
     else:
         gradient = "#4facfe, #00f2fe"
-        card = "rgba(0,200,255,0.2)"
+        card = "rgba(0,200,255,0.25)"
 
     if is_night:
         gradient = "#141E30, #243B55"
-        card = "rgba(20,30,50,0.5)"
+        card = "rgba(20,30,50,0.6)"
 
     return gradient, card
 
@@ -136,6 +135,19 @@ if st.sidebar.button("Get Weather"):
     hour = pd.Timestamp.now().hour
     gradient, card_color = get_theme(current_weather, hour)
 
+    # ✅ BACKGROUND FIX (MAIN PART)
+    st.markdown(
+        f"""
+        <style>
+        .stApp {{
+            background: linear-gradient(135deg, {gradient});
+            background-attachment: fixed;
+        }}
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+
     # 🌈 Animated Header
     st.markdown(f"""
     <style>
@@ -168,8 +180,17 @@ if st.sidebar.button("Get Weather"):
 
     def card(title, value):
         return f"""
-        <div style="background:{card_color};padding:20px;border-radius:15px;text-align:center;">
-        <h4>{title}</h4><h2>{value}</h2></div>
+        <div style="
+            background:{card_color};
+            padding:20px;
+            border-radius:15px;
+            text-align:center;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+        ">
+        <h4>{title}</h4>
+        <h2>{value}</h2>
+        </div>
         """
 
     col1.markdown(card("Avg Temp", f"{df['Temp'].mean():.1f}°C"), True)
