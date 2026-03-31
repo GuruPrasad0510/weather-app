@@ -7,12 +7,12 @@ import plotly.express as px
 
 API_KEY = os.getenv("API_KEY")
 
-st.set_page_config(page_title="Weather Intelligence", layout="wide")
+st.set_page_config(page_title="Weather Intelligence Pro", layout="wide")
 
 # 🌍 Auto location
 def get_location():
     try:
-        return requests.get("http://ip-api.com/json/").json()['city']
+        return requests.get("http://ip-api.com/json/", timeout=5).json().get('city', 'Bangalore')
     except:
         return "Bangalore"
 
@@ -20,27 +20,30 @@ def get_location():
 def get_weather_data(location):
     try:
         url = f"https://api.openweathermap.org/data/2.5/forecast?q={location}&appid={API_KEY}&units=metric"
-        data = requests.get(url).json()
+        data = requests.get(url, timeout=5).json()
 
         if data.get("cod") != "200":
-            return pd.DataFrame()
+            return pd.DataFrame(), None
 
         rows = []
         for e in data['list']:
             rows.append({
                 "Datetime": e['dt_txt'],
                 "Temp": e['main']['temp'],
+                "Feels Like": e['main']['feels_like'],
                 "Humidity": e['main']['humidity'],
+                "Pressure": e['main']['pressure'],
+                "Wind": e['wind']['speed'],
                 "Rain": e.get('rain', {}).get('3h', 0),
                 "Weather": e['weather'][0]['description']
             })
 
         df = pd.DataFrame(rows)
         df['Datetime'] = pd.to_datetime(df['Datetime'])
-        return df
+        return df, data['list'][0]
 
     except:
-        return pd.DataFrame()
+        return pd.DataFrame(), None
 
 # 📅 Summary
 def daily_summary(df):
@@ -69,42 +72,21 @@ def get_emoji(desc):
 
 # ================= UI =================
 
-# 🎨 Clean Dark Theme
 st.markdown("""
 <style>
-.stApp {
-    background-color: #0e1117;
-    color: white;
-}
-
-/* Title */
-.title {
-    text-align: center;
-    font-size: 40px;
-    font-weight: 700;
-    margin-bottom: 20px;
-}
-
-/* Cards */
+.stApp { background-color: #0e1117; color: white; }
+.title { text-align: center; font-size: 42px; font-weight: 700; }
 .card {
     background: #1c2333;
     padding: 20px;
     border-radius: 15px;
     text-align: center;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.4);
-}
-
-/* Table */
-[data-testid="stDataFrame"] {
-    background: #111827;
-    border-radius: 10px;
 }
 </style>
 """, unsafe_allow_html=True)
 
 # Sidebar
 loc = get_location()
-
 st.sidebar.title("⚙ Control Panel")
 location = st.sidebar.text_input("📍 City", loc)
 view = st.sidebar.radio("📊 View", ["Overview", "Trends", "Raw Data"])
@@ -113,52 +95,50 @@ view = st.sidebar.radio("📊 View", ["Overview", "Trends", "Raw Data"])
 
 if st.sidebar.button("Get Weather"):
 
-    df = get_weather_data(location)
+    df, current = get_weather_data(location)
 
     if df.empty:
-        st.error("Invalid city or API issue")
+        st.error("❌ Invalid city or API issue")
         st.stop()
 
     summary = daily_summary(df)
 
-    temp = df['Temp'].iloc[0]
-    weather = df['Weather'].iloc[0]
+    # 🌟 HEADER
+    temp = current['main']['temp']
+    weather = current['weather'][0]['description']
     emoji = get_emoji(weather)
 
-    # 🌟 Title
     st.markdown(f"""
     <div class="title">
-    {emoji} {location.title()} | {temp:.1f}°C — {weather.title()}
+    {emoji} {location.title()} — {temp:.1f}°C | {weather.title()}
     </div>
     """, unsafe_allow_html=True)
 
-    # 📊 Cards
+    # 📊 ACCUWEATHER STYLE CARDS
     col1, col2, col3, col4 = st.columns(4)
 
-    def card(t, v):
-        return f"""
-        <div class="card">
-            <h4 style="color:#9ca3af;">{t}</h4>
-            <h2>{v}</h2>
-        </div>
-        """
+    def card(title, value):
+        return f"<div class='card'><h4>{title}</h4><h2>{value}</h2></div>"
 
-    col1.markdown(card("Avg Temp", f"{df['Temp'].mean():.1f}°C"), True)
-    col2.markdown(card("Max Temp", f"{df['Temp'].max():.1f}°C"), True)
-    col3.markdown(card("Min Temp", f"{df['Temp'].min():.1f}°C"), True)
-    col4.markdown(card("Rain", f"{df['Rain'].sum():.1f} mm"), True)
+    col1.markdown(card("Feels Like", f"{current['main']['feels_like']}°C"), True)
+    col2.markdown(card("Humidity", f"{current['main']['humidity']}%"), True)
+    col3.markdown(card("Wind", f"{current['wind']['speed']} m/s"), True)
+    col4.markdown(card("Pressure", f"{current['main']['pressure']} hPa"), True)
 
     st.markdown("---")
 
-    # 📊 Views
+    # 📊 VIEWS
     if view == "Overview":
+        st.subheader("📅 Daily Summary")
         st.dataframe(summary, use_container_width=True)
 
     elif view == "Trends":
+        st.subheader("📈 Temperature Trend")
         fig = px.line(df, x="Datetime", y="Temp", markers=True)
         st.plotly_chart(fig, use_container_width=True)
 
     else:
+        st.subheader("📋 Raw Data")
         st.dataframe(df, use_container_width=True)
 
     # 📥 Download
