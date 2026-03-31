@@ -131,12 +131,41 @@ if st.sidebar.button("Get Weather"):
     emoji = get_emoji(weather)
 
     # 🌟 HERO
-    st.markdown(f"""
-    <div class="hero">
-        <div class="hero-temp">{emoji} {temp:.1f}°C</div>
-        <div class="hero-desc">{weather.title()} in {location.title()}</div>
-    </div>
-    """, unsafe_allow_html=True)
+   for i in range(0, len(df), 8):
+    day = df.iloc[i:i+8]
+
+    date = day['Datetime'].iloc[0]
+    day_name = date.strftime("%a").upper()
+    date_str = date.strftime("%m/%d")
+
+    max_temp = day['Temp'].max()
+    min_temp = day['Temp'].min()
+
+    weather = day['Weather'].mode()[0]
+    rain = day['Rain'].sum()
+
+    emoji = get_emoji(weather)
+
+    # 🔥 Proper layout using columns
+    col1, col2, col3, col4, col5 = st.columns([1, 1, 2, 3, 1])
+
+    with col1:
+        st.markdown(f"**{day_name}**")
+        st.caption(date_str)
+
+    with col2:
+        st.markdown(f"<h3>{emoji}</h3>", unsafe_allow_html=True)
+
+    with col3:
+        st.markdown(f"### {max_temp:.0f}° / {min_temp:.0f}°")
+
+    with col4:
+        st.markdown(weather.title())
+
+    with col5:
+        st.markdown(f"💧 {rain:.0f} mm")
+
+    st.divider()
 
     # 📊 CARDS
     col1, col2, col3, col4 = st.columns(4)
