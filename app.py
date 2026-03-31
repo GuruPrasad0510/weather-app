@@ -46,16 +46,6 @@ def get_weather_data(location):
         return pd.DataFrame(), None
 
 
-def daily_summary(df):
-    df['Date'] = df['Datetime'].dt.date
-    s = df.groupby('Date').agg({
-        'Temp': ['min', 'max', 'mean'],
-        'Rain': 'sum'
-    })
-    s.columns = ['Min Temp', 'Max Temp', 'Avg Temp', 'Rain']
-    return s.reset_index()
-
-
 def convert_to_excel(df):
     buf = BytesIO()
     df.to_excel(buf, index=False)
@@ -80,17 +70,15 @@ st.markdown("""
     color: white;
 }
 
-/* HERO SECTION */
+/* HERO */
 .hero {
     text-align: center;
     padding: 30px;
 }
-
 .hero-temp {
     font-size: 70px;
     font-weight: 700;
 }
-
 .hero-desc {
     font-size: 22px;
     color: #cbd5e1;
@@ -104,7 +92,7 @@ st.markdown("""
     text-align: center;
 }
 
-/* SUBTITLE */
+/* SECTION */
 .section {
     font-size: 22px;
     margin-top: 20px;
@@ -135,8 +123,6 @@ if st.sidebar.button("Get Weather"):
         st.error("Invalid city or API issue")
         st.stop()
 
-    summary = daily_summary(df)
-
     temp = current['main']['temp']
     feels = current['main']['feels_like']
     weather = current['weather'][0]['description']
@@ -144,8 +130,7 @@ if st.sidebar.button("Get Weather"):
     wind = current['wind']['speed']
     emoji = get_emoji(weather)
 
-    # ------------------ HERO SECTION ------------------
-
+    # 🌟 HERO
     st.markdown(f"""
     <div class="hero">
         <div class="hero-temp">{emoji} {temp:.1f}°C</div>
@@ -153,8 +138,7 @@ if st.sidebar.button("Get Weather"):
     </div>
     """, unsafe_allow_html=True)
 
-    # ------------------ CARDS ------------------
-
+    # 📊 CARDS
     col1, col2, col3, col4 = st.columns(4)
 
     def card(title, value):
@@ -167,25 +151,75 @@ if st.sidebar.button("Get Weather"):
 
     st.markdown("---")
 
-    # ------------------ CONTENT ------------------
+    # ------------------ OVERVIEW (ACCUWEATHER STYLE) ------------------
 
     if view == "Overview":
-        st.markdown("<div class='section'>📅 5-Day Summary</div>", unsafe_allow_html=True)
-        st.dataframe(summary, use_container_width=True)
+        st.markdown("<div class='section'>📅 5-Day Forecast</div>", unsafe_allow_html=True)
+
+        for i in range(0, len(df), 8):
+            day = df.iloc[i:i+8]
+
+            date = day['Datetime'].iloc[0]
+            day_name = date.strftime("%a").upper()
+            date_str = date.strftime("%m/%d")
+
+            max_temp = day['Temp'].max()
+            min_temp = day['Temp'].min()
+
+            weather = day['Weather'].mode()[0]
+            rain = day['Rain'].sum()
+
+            emoji = get_emoji(weather)
+
+            st.markdown(f"""
+            <div style="
+                background:#1e293b;
+                padding:15px;
+                border-radius:12px;
+                margin-bottom:10px;
+                display:flex;
+                justify-content:space-between;
+                align-items:center;
+            ">
+                <div>
+                    <b>{day_name}</b><br>
+                    <small>{date_str}</small>
+                </div>
+
+                <div style="font-size:22px;">
+                    {emoji}
+                </div>
+
+                <div>
+                    <b>{max_temp:.0f}°</b> / {min_temp:.0f}°
+                </div>
+
+                <div style="width:200px;">
+                    {weather.title()}
+                </div>
+
+                <div>
+                    💧 {rain:.0f} mm
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+    # ------------------ TRENDS ------------------
 
     elif view == "Trends":
         st.markdown("<div class='section'>📈 Temperature Trend</div>", unsafe_allow_html=True)
         fig = px.line(df, x="Datetime", y="Temp", markers=True)
         st.plotly_chart(fig, use_container_width=True)
 
+    # ------------------ RAW DATA ------------------
+
     else:
         st.markdown("<div class='section'>📋 Raw Data</div>", unsafe_allow_html=True)
         st.dataframe(df, use_container_width=True)
 
-    # ------------------ DOWNLOAD ------------------
-
+    # 📥 DOWNLOAD
     st.download_button(
         "⬇ Download Excel",
-        convert_to_excel(summary),
+        convert_to_excel(df),
         "weather.xlsx"
     )
