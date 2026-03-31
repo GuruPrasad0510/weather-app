@@ -144,10 +144,10 @@ if st.sidebar.button("Get Weather"):
     def card(title, value):
         return f"<div class='card'><h4>{title}</h4><h2>{value}</h2></div>"
 
-    col1.markdown(card("Feels Like", f"{feels:.1f}°C"), True)
-    col2.markdown(card("Humidity", f"{humidity}%"), True)
-    col3.markdown(card("Wind", f"{wind} m/s"), True)
-    col4.markdown(card("Rain (Total)", f"{df['Rain'].sum():.1f} mm"), True)
+    col1.markdown(card("Feels Like", f"{feels:.1f}°C"), unsafe_allow_html=True)
+    col2.markdown(card("Humidity", f"{humidity}%"), unsafe_allow_html=True)
+    col3.markdown(card("Wind", f"{wind} m/s"), unsafe_allow_html=True)
+    col4.markdown(card("Rain (Total)", f"{df['Rain'].sum():.1f} mm"), unsafe_allow_html=True)
 
     st.markdown("---")
 
