@@ -25,10 +25,7 @@ def get_weather_data(location):
         data = requests.get(url).json()
 
         if data.get("cod") != "200":
-            return pd.DataFrame(), None, None
-
-        lat = data['city']['coord']['lat']
-        lon = data['city']['coord']['lon']
+            return pd.DataFrame()
 
         weather_list = []
         for entry in data['list']:
@@ -43,10 +40,10 @@ def get_weather_data(location):
         df = pd.DataFrame(weather_list)
         df['Datetime'] = pd.to_datetime(df['Datetime'])
 
-        return df, lat, lon
+        return df
 
     except:
-        return pd.DataFrame(), None, None
+        return pd.DataFrame()
 
 # 📅 Summary
 def daily_summary(df):
@@ -112,20 +109,6 @@ def get_lottie_animation(desc):
     else:
         return load_lottie_url("https://assets2.lottiefiles.com/packages/lf20_Stt1Rk.json")
 
-# 🌍 SAFE GEO FUNCTION (FIXED)
-def get_city_coords(city):
-    try:
-        url = f"http://api.openweathermap.org/geo/1.0/direct?q={city}&limit=1&appid={API_KEY}"
-        res = requests.get(url).json()
-
-        if not res:
-            return None, None
-
-        return res[0].get('lat'), res[0].get('lon')
-
-    except:
-        return None, None
-
 # ================= UI =================
 
 auto_location = get_location()
@@ -133,13 +116,12 @@ auto_location = get_location()
 st.sidebar.title("⚙ Control Panel")
 location = st.sidebar.text_input("📍 City", auto_location)
 view = st.sidebar.radio("📊 View", ["Overview", "Trends", "Raw Data"])
-multi_cities = st.sidebar.text_input("🌍 Compare Cities", "Bangalore, Mumbai, Delhi")
 
 # ================= MAIN =================
 
 if st.sidebar.button("Get Weather"):
 
-    df, lat, lon = get_weather_data(location)
+    df = get_weather_data(location)
 
     if df.empty:
         st.error("Invalid city or API issue")
@@ -194,51 +176,6 @@ if st.sidebar.button("Get Weather"):
     col2.markdown(card("Max Temp", f"{df['Temp'].max():.1f}°C"), True)
     col3.markdown(card("Min Temp", f"{df['Temp'].min():.1f}°C"), True)
     col4.markdown(card("Rain", f"{df['Rain (mm)'].sum():.1f} mm"), True)
-
-    # 🌧 Radar
-    tile_url = f"https://tile.openweathermap.org/map/precipitation_new/{{z}}/{{x}}/{{y}}.png?appid={API_KEY}"
-
-    st.components.v1.html(f"""
-    <div id="map" style="height:400px;"></div>
-    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
-    <script>
-    var map = L.map('map').setView([{lat}, {lon}], 6);
-    L.tileLayer('https://tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png').addTo(map);
-    L.tileLayer('{tile_url}', {{opacity:0.6}}).addTo(map);
-    </script>
-    """, height=420)
-
-    # 🌍 Multi-city (SAFE)
-    cities = [c.strip() for c in multi_cities.split(",")]
-    data = []
-
-    for c in cities:
-        la, lo = get_city_coords(c)
-
-        if la is None:
-            continue
-
-        temp_df, _, _ = get_weather_data(c)
-
-        if temp_df.empty:
-            continue
-
-        temp = temp_df['Temp'].iloc[0]
-
-        data.append({
-            "City": c,
-            "lat": la,
-            "lon": lo,
-            "Temp": temp
-        })
-
-    mdf = pd.DataFrame(data)
-
-    if not mdf.empty:
-        fig = px.scatter_mapbox(mdf, lat="lat", lon="lon", size="Temp", color="Temp", hover_name="City")
-        fig.update_layout(mapbox_style="open-street-map")
-        st.plotly_chart(fig, use_container_width=True)
 
     # 📊 Views
     if view == "Overview":
