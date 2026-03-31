@@ -114,7 +114,7 @@ if st.session_state.page == "home":
     st.markdown("""
     <div style="text-align:center; margin-top:120px;">
         <h1>🌤 Weather </h1>
-        <p style="color:grey;">Real-time weather dashboard</p>
+        <p style="color:white;">Real-time weather dashboard</p>
     </div>
     """, unsafe_allow_html=True)
 
