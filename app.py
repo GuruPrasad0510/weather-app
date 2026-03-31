@@ -4,9 +4,10 @@ import pandas as pd
 import os
 from io import BytesIO
 import plotly.express as px
+import time
 
 # 🔑 API KEY
-API_KEY = os.getenv("API_KEY")  # or replace with your key
+API_KEY = os.getenv("API_KEY")  # or replace with string
 
 st.set_page_config(page_title="Weather Intelligence", layout="wide")
 
@@ -17,6 +18,9 @@ if "page" not in st.session_state:
 
 if "location" not in st.session_state:
     st.session_state.location = ""
+
+if "recent" not in st.session_state:
+    st.session_state.recent = []
 
 # ------------------ FUNCTIONS ------------------
 
@@ -54,6 +58,13 @@ def convert_to_excel(df):
     df.to_excel(buf, index=False)
     buf.seek(0)
     return buf
+
+
+def add_to_recent(city):
+    if city not in st.session_state.recent:
+        st.session_state.recent.insert(0, city)
+        st.session_state.recent = st.session_state.recent[:5]
+
 
 # ------------------ UI STYLE ------------------
 
@@ -95,7 +106,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # =====================================================
-# 🟢 PAGE 1 → HOME
+# 🟢 HOME PAGE
 # =====================================================
 
 if st.session_state.page == "home":
@@ -111,21 +122,36 @@ if st.session_state.page == "home":
 
     if st.button("🚀 Get Weather"):
         if city:
+            with st.spinner("Fetching weather data... ⏳"):
+                time.sleep(1.5)
+
             st.session_state.location = city
+            add_to_recent(city)
             st.session_state.page = "dashboard"
             st.rerun()
         else:
             st.warning("Please enter a city")
 
+    # 📍 Recent Searches
+    if st.session_state.recent:
+        st.markdown("### 🔍 Recent Searches")
+
+        cols = st.columns(len(st.session_state.recent))
+        for i, c in enumerate(st.session_state.recent):
+            if cols[i].button(c):
+                st.session_state.location = c
+                st.session_state.page = "dashboard"
+                st.rerun()
+
 # =====================================================
-# 🔵 PAGE 2 → DASHBOARD
+# 🔵 DASHBOARD PAGE
 # =====================================================
 
 elif st.session_state.page == "dashboard":
 
     location = st.session_state.location
 
-    # 🔙 BACK BUTTON
+    # 🔙 Back Button
     col1, col2 = st.columns([1, 10])
     with col1:
         if st.button("⬅"):
@@ -135,6 +161,9 @@ elif st.session_state.page == "dashboard":
     if not API_KEY:
         st.error("❌ API key missing")
         st.stop()
+
+    with st.spinner("Loading dashboard... ⏳"):
+        time.sleep(1)
 
     df, current = get_weather_data(location)
 
@@ -173,7 +202,7 @@ elif st.session_state.page == "dashboard":
 
     st.markdown("---")
 
-    # 📅 FORECAST
+    # 📅 Forecast
     st.markdown("<div class='section'>📅 5-Day Forecast</div>", unsafe_allow_html=True)
 
     for i in range(0, len(df), 8):
@@ -212,12 +241,12 @@ elif st.session_state.page == "dashboard":
 
         st.divider()
 
-    # 📈 CHART
+    # 📈 Chart
     st.markdown("<div class='section'>📈 Temperature Trend</div>", unsafe_allow_html=True)
     fig = px.line(df, x="Datetime", y="Temp", markers=True)
     st.plotly_chart(fig, use_container_width=True)
 
-    # 📥 DOWNLOAD
+    # 📥 Download
     st.download_button(
         "⬇ Download Excel",
         convert_to_excel(df),
