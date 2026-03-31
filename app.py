@@ -5,7 +5,8 @@ import os
 from io import BytesIO
 import plotly.express as px
 
-API_KEY = os.getenv("API_KEY")
+#  API KEY
+API_KEY = os.getenv("API_KEY")  
 
 st.set_page_config(page_title="Weather Intelligence", layout="wide")
 
@@ -35,7 +36,8 @@ def get_weather_data(location):
                 "Humidity": e['main']['humidity'],
                 "Wind": e['wind']['speed'],
                 "Rain": e.get('rain', {}).get('3h', 0),
-                "Weather": e['weather'][0]['description']
+                "Weather": e['weather'][0]['description'],
+                "Icon": e['weather'][0]['icon']
             })
 
         df = pd.DataFrame(rows)
@@ -53,14 +55,6 @@ def convert_to_excel(df):
     return buf
 
 
-def get_emoji(desc):
-    desc = desc.lower()
-    if "rain" in desc: return "🌧"
-    if "cloud" in desc: return "☁"
-    if "clear" in desc: return "☀"
-    return "🌤"
-
-
 # ------------------ UI STYLE ------------------
 
 st.markdown("""
@@ -70,21 +64,21 @@ st.markdown("""
     color: white;
 }
 
-/* HERO */
 .hero {
     text-align: center;
     padding: 30px;
 }
+
 .hero-temp {
     font-size: 70px;
     font-weight: 700;
 }
+
 .hero-desc {
     font-size: 22px;
     color: #cbd5e1;
 }
 
-/* CARDS */
 .card {
     background: #1e293b;
     padding: 20px;
@@ -92,7 +86,6 @@ st.markdown("""
     text-align: center;
 }
 
-/* SECTION */
 .section {
     font-size: 22px;
     margin-top: 20px;
@@ -106,12 +99,14 @@ st.markdown("""
 loc = get_location()
 
 st.sidebar.title("⚙ Settings")
-location = st.sidebar.text_input("📍 City", loc)
+location = st.sidebar.text_input("📍 Enter City", loc)
 view = st.sidebar.radio("View", ["Overview", "Trends", "Raw Data"])
+
+search = st.sidebar.button("🔍 Search Weather")
 
 # ------------------ MAIN ------------------
 
-if st.sidebar.button("Get Weather"):
+if search:
 
     if not API_KEY:
         st.error("❌ API key missing")
@@ -120,7 +115,7 @@ if st.sidebar.button("Get Weather"):
     df, current = get_weather_data(location)
 
     if df.empty:
-        st.error("Invalid city or API issue")
+        st.error("❌ Invalid city or API issue")
         st.stop()
 
     temp = current['main']['temp']
@@ -128,12 +123,16 @@ if st.sidebar.button("Get Weather"):
     weather = current['weather'][0]['description']
     humidity = current['main']['humidity']
     wind = current['wind']['speed']
-    emoji = get_emoji(weather)
+
+    # 🌟 ICON
+    icon = current['weather'][0]['icon']
+    icon_url = f"https://openweathermap.org/img/wn/{icon}@2x.png"
 
     # 🌟 HERO
     st.markdown(f"""
     <div class="hero">
-        <div class="hero-temp">{emoji} {temp:.1f}°C</div>
+        <img src="{icon_url}" width="100">
+        <div class="hero-temp">{temp:.1f}°C</div>
         <div class="hero-desc">{weather.title()} in {location.title()}</div>
     </div>
     """, unsafe_allow_html=True)
@@ -169,7 +168,8 @@ if st.sidebar.button("Get Weather"):
             weather_day = day['Weather'].mode()[0]
             rain = day['Rain'].sum()
 
-            emoji_day = get_emoji(weather_day)
+            icon_day = day['Icon'].iloc[0]
+            icon_url_day = f"https://openweathermap.org/img/wn/{icon_day}@2x.png"
 
             col1, col2, col3, col4, col5 = st.columns([1, 1, 2, 3, 1])
 
@@ -178,7 +178,7 @@ if st.sidebar.button("Get Weather"):
                 st.caption(date_str)
 
             with col2:
-                st.markdown(f"<h3>{emoji_day}</h3>", unsafe_allow_html=True)
+                st.image(icon_url_day, width=50)
 
             with col3:
                 st.markdown(f"### {max_temp:.0f}° / {min_temp:.0f}°")
