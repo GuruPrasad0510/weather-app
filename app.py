@@ -6,7 +6,7 @@ from io import BytesIO
 import plotly.express as px
 import time
 
-# 🔑 API KEY
+# API KEY
 API_KEY = os.getenv("API_KEY")  # or replace with string
 
 st.set_page_config(page_title="Weather Intelligence", layout="wide")
@@ -106,21 +106,21 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # =====================================================
-# 🟢 HOME PAGE
+#  HOME PAGE
 # =====================================================
 
 if st.session_state.page == "home":
 
     st.markdown("""
     <div style="text-align:center; margin-top:120px;">
-        <h1>🌤 Weather Intelligence</h1>
-        <p style="color:gray;">Real-time weather dashboard</p>
+        <h1>🌤 Weather </h1>
+        <p style="color:black;">Real-time weather dashboard</p>
     </div>
     """, unsafe_allow_html=True)
 
-    city = st.text_input("📍 Enter City", placeholder="e.g. Bangalore")
+    city = st.text_input("📍 Enter City", placeholder="e.g. Bengaluru")
 
-    if st.button("🚀 Get Weather"):
+    if st.button(" Get Weather"):
         if city:
             with st.spinner("Fetching weather data... ⏳"):
                 time.sleep(1.5)
@@ -144,7 +144,7 @@ if st.session_state.page == "home":
                 st.rerun()
 
 # =====================================================
-# 🔵 DASHBOARD PAGE
+# DASHBOARD PAGE
 # =====================================================
 
 elif st.session_state.page == "dashboard":
@@ -180,7 +180,7 @@ elif st.session_state.page == "dashboard":
     icon = current['weather'][0]['icon']
     icon_url = f"https://openweathermap.org/img/wn/{icon}@2x.png"
 
-    # 🌟 HERO
+    # HERO
     st.markdown(f"""
     <div class="hero">
         <img src="{icon_url}" width="100">
@@ -189,7 +189,7 @@ elif st.session_state.page == "dashboard":
     </div>
     """, unsafe_allow_html=True)
 
-    # 📊 CARDS
+    # CARDS
     col1, col2, col3, col4 = st.columns(4)
 
     def card(title, value):
@@ -202,8 +202,8 @@ elif st.session_state.page == "dashboard":
 
     st.markdown("---")
 
-    # 📅 Forecast
-    st.markdown("<div class='section'>📅 5-Day Forecast</div>", unsafe_allow_html=True)
+    # Forecast
+    st.markdown("<div class='section'> 5-Day Forecast</div>", unsafe_allow_html=True)
 
     for i in range(0, len(df), 8):
         day = df.iloc[i:i+8]
@@ -241,12 +241,12 @@ elif st.session_state.page == "dashboard":
 
         st.divider()
 
-    # 📈 Chart
-    st.markdown("<div class='section'>📈 Temperature Trend</div>", unsafe_allow_html=True)
+    # Chart
+    st.markdown("<div class='section'> Temperature Trend</div>", unsafe_allow_html=True)
     fig = px.line(df, x="Datetime", y="Temp", markers=True)
     st.plotly_chart(fig, use_container_width=True)
 
-    # 📥 Download
+    #  Download
     st.download_button(
         "⬇ Download Excel",
         convert_to_excel(df),
