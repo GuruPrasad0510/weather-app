@@ -5,19 +5,20 @@ import os
 from io import BytesIO
 import plotly.express as px
 
-#  API KEY
-API_KEY = os.getenv("API_KEY")  
+# 🔑 API KEY
+API_KEY = os.getenv("API_KEY")  # or replace with your key
 
 st.set_page_config(page_title="Weather Intelligence", layout="wide")
 
+# ------------------ SESSION STATE ------------------
+
+if "page" not in st.session_state:
+    st.session_state.page = "home"
+
+if "location" not in st.session_state:
+    st.session_state.location = ""
+
 # ------------------ FUNCTIONS ------------------
-
-def get_location():
-    try:
-        return requests.get("http://ip-api.com/json/", timeout=5).json()['city']
-    except:
-        return "Bangalore"
-
 
 def get_weather_data(location):
     try:
@@ -53,7 +54,6 @@ def convert_to_excel(df):
     df.to_excel(buf, index=False)
     buf.seek(0)
     return buf
-
 
 # ------------------ UI STYLE ------------------
 
@@ -94,19 +94,43 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# ------------------ SIDEBAR ------------------
+# =====================================================
+# 🟢 PAGE 1 → HOME
+# =====================================================
 
-loc = get_location()
+if st.session_state.page == "home":
 
-st.sidebar.title("⚙ Settings")
-location = st.sidebar.text_input("📍 Enter City", loc)
-view = st.sidebar.radio("View", ["Overview", "Trends", "Raw Data"])
+    st.markdown("""
+    <div style="text-align:center; margin-top:120px;">
+        <h1>🌤 Weather Intelligence</h1>
+        <p style="color:gray;">Real-time weather dashboard</p>
+    </div>
+    """, unsafe_allow_html=True)
 
-search = st.sidebar.button("🔍 Search Weather")
+    city = st.text_input("📍 Enter City", placeholder="e.g. Bangalore")
 
-# ------------------ MAIN ------------------
+    if st.button("🚀 Get Weather"):
+        if city:
+            st.session_state.location = city
+            st.session_state.page = "dashboard"
+            st.rerun()
+        else:
+            st.warning("Please enter a city")
 
-if search:
+# =====================================================
+# 🔵 PAGE 2 → DASHBOARD
+# =====================================================
+
+elif st.session_state.page == "dashboard":
+
+    location = st.session_state.location
+
+    # 🔙 BACK BUTTON
+    col1, col2 = st.columns([1, 10])
+    with col1:
+        if st.button("⬅"):
+            st.session_state.page = "home"
+            st.rerun()
 
     if not API_KEY:
         st.error("❌ API key missing")
@@ -124,7 +148,6 @@ if search:
     humidity = current['main']['humidity']
     wind = current['wind']['speed']
 
-    # 🌟 ICON
     icon = current['weather'][0]['icon']
     icon_url = f"https://openweathermap.org/img/wn/{icon}@2x.png"
 
@@ -150,59 +173,49 @@ if search:
 
     st.markdown("---")
 
-    # ------------------ OVERVIEW ------------------
+    # 📅 FORECAST
+    st.markdown("<div class='section'>📅 5-Day Forecast</div>", unsafe_allow_html=True)
 
-    if view == "Overview":
-        st.markdown("<div class='section'>📅 5-Day Forecast</div>", unsafe_allow_html=True)
+    for i in range(0, len(df), 8):
+        day = df.iloc[i:i+8]
 
-        for i in range(0, len(df), 8):
-            day = df.iloc[i:i+8]
+        date = day['Datetime'].iloc[0]
+        day_name = date.strftime("%a").upper()
+        date_str = date.strftime("%m/%d")
 
-            date = day['Datetime'].iloc[0]
-            day_name = date.strftime("%a").upper()
-            date_str = date.strftime("%m/%d")
+        max_temp = day['Temp'].max()
+        min_temp = day['Temp'].min()
 
-            max_temp = day['Temp'].max()
-            min_temp = day['Temp'].min()
+        weather_day = day['Weather'].mode()[0]
+        rain = day['Rain'].sum()
 
-            weather_day = day['Weather'].mode()[0]
-            rain = day['Rain'].sum()
+        icon_day = day['Icon'].iloc[0]
+        icon_url_day = f"https://openweathermap.org/img/wn/{icon_day}@2x.png"
 
-            icon_day = day['Icon'].iloc[0]
-            icon_url_day = f"https://openweathermap.org/img/wn/{icon_day}@2x.png"
+        col1, col2, col3, col4, col5 = st.columns([1, 1, 2, 3, 1])
 
-            col1, col2, col3, col4, col5 = st.columns([1, 1, 2, 3, 1])
+        with col1:
+            st.markdown(f"**{day_name}**")
+            st.caption(date_str)
 
-            with col1:
-                st.markdown(f"**{day_name}**")
-                st.caption(date_str)
+        with col2:
+            st.image(icon_url_day, width=50)
 
-            with col2:
-                st.image(icon_url_day, width=50)
+        with col3:
+            st.markdown(f"### {max_temp:.0f}° / {min_temp:.0f}°")
 
-            with col3:
-                st.markdown(f"### {max_temp:.0f}° / {min_temp:.0f}°")
+        with col4:
+            st.markdown(weather_day.title())
 
-            with col4:
-                st.markdown(weather_day.title())
+        with col5:
+            st.markdown(f"💧 {rain:.0f} mm")
 
-            with col5:
-                st.markdown(f"💧 {rain:.0f} mm")
+        st.divider()
 
-            st.divider()
-
-    # ------------------ TRENDS ------------------
-
-    elif view == "Trends":
-        st.markdown("<div class='section'>📈 Temperature Trend</div>", unsafe_allow_html=True)
-        fig = px.line(df, x="Datetime", y="Temp", markers=True)
-        st.plotly_chart(fig, use_container_width=True)
-
-    # ------------------ RAW DATA ------------------
-
-    else:
-        st.markdown("<div class='section'>📋 Raw Data</div>", unsafe_allow_html=True)
-        st.dataframe(df, use_container_width=True)
+    # 📈 CHART
+    st.markdown("<div class='section'>📈 Temperature Trend</div>", unsafe_allow_html=True)
+    fig = px.line(df, x="Datetime", y="Temp", markers=True)
+    st.plotly_chart(fig, use_container_width=True)
 
     # 📥 DOWNLOAD
     st.download_button(
