@@ -7,9 +7,9 @@ import plotly.express as px
 import time
 
 # API KEY
-API_KEY = os.getenv("API_KEY")  # or replace with string
+API_KEY = os.getenv("API_KEY")  
 
-st.set_page_config(page_title="Weather Intelligence", layout="wide")
+st.set_page_config(page_title="Weather", layout="wide")
 
 # ------------------ SESSION STATE ------------------
 
@@ -114,7 +114,7 @@ if st.session_state.page == "home":
     st.markdown("""
     <div style="text-align:center; margin-top:120px;">
         <h1>🌤 Weather </h1>
-        <p style="color:black;">Real-time weather dashboard</p>
+        <p style="color:grey;">Real-time weather dashboard</p>
     </div>
     """, unsafe_allow_html=True)
 
