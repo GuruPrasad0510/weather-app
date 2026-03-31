@@ -7,16 +7,17 @@ import plotly.express as px
 
 API_KEY = os.getenv("API_KEY")
 
-st.set_page_config(page_title="Weather Intelligence Pro", layout="wide")
+st.set_page_config(page_title="Weather Intelligence", layout="wide")
 
-# 🌍 Auto location
+# ------------------ FUNCTIONS ------------------
+
 def get_location():
     try:
-        return requests.get("http://ip-api.com/json/", timeout=5).json().get('city', 'Bangalore')
+        return requests.get("http://ip-api.com/json/", timeout=5).json()['city']
     except:
         return "Bangalore"
 
-# 🌦 Weather Data
+
 def get_weather_data(location):
     try:
         url = f"https://api.openweathermap.org/data/2.5/forecast?q={location}&appid={API_KEY}&units=metric"
@@ -30,9 +31,8 @@ def get_weather_data(location):
             rows.append({
                 "Datetime": e['dt_txt'],
                 "Temp": e['main']['temp'],
-                "Feels Like": e['main']['feels_like'],
+                "Feels": e['main']['feels_like'],
                 "Humidity": e['main']['humidity'],
-                "Pressure": e['main']['pressure'],
                 "Wind": e['wind']['speed'],
                 "Rain": e.get('rain', {}).get('3h', 0),
                 "Weather": e['weather'][0]['description']
@@ -45,24 +45,24 @@ def get_weather_data(location):
     except:
         return pd.DataFrame(), None
 
-# 📅 Summary
+
 def daily_summary(df):
     df['Date'] = df['Datetime'].dt.date
     s = df.groupby('Date').agg({
         'Temp': ['min', 'max', 'mean'],
         'Rain': 'sum'
     })
-    s.columns = ['Min Temp', 'Max Temp', 'Avg Temp', 'Total Rain']
+    s.columns = ['Min Temp', 'Max Temp', 'Avg Temp', 'Rain']
     return s.reset_index()
 
-# 📥 Excel
+
 def convert_to_excel(df):
     buf = BytesIO()
     df.to_excel(buf, index=False)
     buf.seek(0)
     return buf
 
-# 🌤 Emoji
+
 def get_emoji(desc):
     desc = desc.lower()
     if "rain" in desc: return "🌧"
@@ -70,78 +70,120 @@ def get_emoji(desc):
     if "clear" in desc: return "☀"
     return "🌤"
 
-# ================= UI =================
+
+# ------------------ UI STYLE ------------------
 
 st.markdown("""
 <style>
-.stApp { background-color: #0e1117; color: white; }
-.title { text-align: center; font-size: 42px; font-weight: 700; }
+.stApp {
+    background: linear-gradient(180deg, #0b1d3a, #111827);
+    color: white;
+}
+
+/* HERO SECTION */
+.hero {
+    text-align: center;
+    padding: 30px;
+}
+
+.hero-temp {
+    font-size: 70px;
+    font-weight: 700;
+}
+
+.hero-desc {
+    font-size: 22px;
+    color: #cbd5e1;
+}
+
+/* CARDS */
 .card {
-    background: #1c2333;
+    background: #1e293b;
     padding: 20px;
     border-radius: 15px;
     text-align: center;
 }
+
+/* SUBTITLE */
+.section {
+    font-size: 22px;
+    margin-top: 20px;
+    margin-bottom: 10px;
+}
 </style>
 """, unsafe_allow_html=True)
 
-# Sidebar
-loc = get_location()
-st.sidebar.title("⚙ Control Panel")
-location = st.sidebar.text_input("📍 City", loc)
-view = st.sidebar.radio("📊 View", ["Overview", "Trends", "Raw Data"])
+# ------------------ SIDEBAR ------------------
 
-# ================= MAIN =================
+loc = get_location()
+
+st.sidebar.title("⚙ Settings")
+location = st.sidebar.text_input("📍 City", loc)
+view = st.sidebar.radio("View", ["Overview", "Trends", "Raw Data"])
+
+# ------------------ MAIN ------------------
 
 if st.sidebar.button("Get Weather"):
+
+    if not API_KEY:
+        st.error("❌ API key missing")
+        st.stop()
 
     df, current = get_weather_data(location)
 
     if df.empty:
-        st.error("❌ Invalid city or API issue")
+        st.error("Invalid city or API issue")
         st.stop()
 
     summary = daily_summary(df)
 
-    # 🌟 HEADER
     temp = current['main']['temp']
+    feels = current['main']['feels_like']
     weather = current['weather'][0]['description']
+    humidity = current['main']['humidity']
+    wind = current['wind']['speed']
     emoji = get_emoji(weather)
 
+    # ------------------ HERO SECTION ------------------
+
     st.markdown(f"""
-    <div class="title">
-    {emoji} {location.title()} — {temp:.1f}°C | {weather.title()}
+    <div class="hero">
+        <div class="hero-temp">{emoji} {temp:.1f}°C</div>
+        <div class="hero-desc">{weather.title()} in {location.title()}</div>
     </div>
     """, unsafe_allow_html=True)
 
-    # 📊 ACCUWEATHER STYLE CARDS
+    # ------------------ CARDS ------------------
+
     col1, col2, col3, col4 = st.columns(4)
 
     def card(title, value):
         return f"<div class='card'><h4>{title}</h4><h2>{value}</h2></div>"
 
-    col1.markdown(card("Feels Like", f"{current['main']['feels_like']}°C"), True)
-    col2.markdown(card("Humidity", f"{current['main']['humidity']}%"), True)
-    col3.markdown(card("Wind", f"{current['wind']['speed']} m/s"), True)
-    col4.markdown(card("Pressure", f"{current['main']['pressure']} hPa"), True)
+    col1.markdown(card("Feels Like", f"{feels:.1f}°C"), True)
+    col2.markdown(card("Humidity", f"{humidity}%"), True)
+    col3.markdown(card("Wind", f"{wind} m/s"), True)
+    col4.markdown(card("Rain (Total)", f"{df['Rain'].sum():.1f} mm"), True)
 
     st.markdown("---")
 
-    # 📊 VIEWS
+    # ------------------ CONTENT ------------------
+
     if view == "Overview":
-        st.subheader("📅 Daily Summary")
+        st.markdown("<div class='section'>📅 5-Day Summary</div>", unsafe_allow_html=True)
         st.dataframe(summary, use_container_width=True)
 
     elif view == "Trends":
-        st.subheader("📈 Temperature Trend")
+        st.markdown("<div class='section'>📈 Temperature Trend</div>", unsafe_allow_html=True)
         fig = px.line(df, x="Datetime", y="Temp", markers=True)
         st.plotly_chart(fig, use_container_width=True)
 
     else:
-        st.subheader("📋 Raw Data")
+        st.markdown("<div class='section'>📋 Raw Data</div>", unsafe_allow_html=True)
         st.dataframe(df, use_container_width=True)
 
-    # 📥 Download
+    # ------------------ DOWNLOAD ------------------
+
     st.download_button(
         "⬇ Download Excel",
         convert_to_excel(summary),
