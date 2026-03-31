@@ -131,41 +131,12 @@ if st.sidebar.button("Get Weather"):
     emoji = get_emoji(weather)
 
     # 🌟 HERO
-   for i in range(0, len(df), 8):
-    day = df.iloc[i:i+8]
-
-    date = day['Datetime'].iloc[0]
-    day_name = date.strftime("%a").upper()
-    date_str = date.strftime("%m/%d")
-
-    max_temp = day['Temp'].max()
-    min_temp = day['Temp'].min()
-
-    weather = day['Weather'].mode()[0]
-    rain = day['Rain'].sum()
-
-    emoji = get_emoji(weather)
-
-    # 🔥 Proper layout using columns
-    col1, col2, col3, col4, col5 = st.columns([1, 1, 2, 3, 1])
-
-    with col1:
-        st.markdown(f"**{day_name}**")
-        st.caption(date_str)
-
-    with col2:
-        st.markdown(f"<h3>{emoji}</h3>", unsafe_allow_html=True)
-
-    with col3:
-        st.markdown(f"### {max_temp:.0f}° / {min_temp:.0f}°")
-
-    with col4:
-        st.markdown(weather.title())
-
-    with col5:
-        st.markdown(f"💧 {rain:.0f} mm")
-
-    st.divider()
+    st.markdown(f"""
+    <div class="hero">
+        <div class="hero-temp">{emoji} {temp:.1f}°C</div>
+        <div class="hero-desc">{weather.title()} in {location.title()}</div>
+    </div>
+    """, unsafe_allow_html=True)
 
     # 📊 CARDS
     col1, col2, col3, col4 = st.columns(4)
@@ -180,7 +151,7 @@ if st.sidebar.button("Get Weather"):
 
     st.markdown("---")
 
-    # ------------------ OVERVIEW (ACCUWEATHER STYLE) ------------------
+    # ------------------ OVERVIEW ------------------
 
     if view == "Overview":
         st.markdown("<div class='section'>📅 5-Day Forecast</div>", unsafe_allow_html=True)
@@ -195,43 +166,30 @@ if st.sidebar.button("Get Weather"):
             max_temp = day['Temp'].max()
             min_temp = day['Temp'].min()
 
-            weather = day['Weather'].mode()[0]
+            weather_day = day['Weather'].mode()[0]
             rain = day['Rain'].sum()
 
-            emoji = get_emoji(weather)
+            emoji_day = get_emoji(weather_day)
 
-            st.markdown(f"""
-            <div style="
-                background:#1e293b;
-                padding:15px;
-                border-radius:12px;
-                margin-bottom:10px;
-                display:flex;
-                justify-content:space-between;
-                align-items:center;
-            ">
-                <div>
-                    <b>{day_name}</b><br>
-                    <small>{date_str}</small>
-                </div>
+            col1, col2, col3, col4, col5 = st.columns([1, 1, 2, 3, 1])
 
-                <div style="font-size:22px;">
-                    {emoji}
-                </div>
+            with col1:
+                st.markdown(f"**{day_name}**")
+                st.caption(date_str)
 
-                <div>
-                    <b>{max_temp:.0f}°</b> / {min_temp:.0f}°
-                </div>
+            with col2:
+                st.markdown(f"<h3>{emoji_day}</h3>", unsafe_allow_html=True)
 
-                <div style="width:200px;">
-                    {weather.title()}
-                </div>
+            with col3:
+                st.markdown(f"### {max_temp:.0f}° / {min_temp:.0f}°")
 
-                <div>
-                    💧 {rain:.0f} mm
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
+            with col4:
+                st.markdown(weather_day.title())
+
+            with col5:
+                st.markdown(f"💧 {rain:.0f} mm")
+
+            st.divider()
 
     # ------------------ TRENDS ------------------
 
