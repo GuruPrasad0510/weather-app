@@ -4,8 +4,7 @@ import pandas as pd
 import os
 from io import BytesIO
 import plotly.express as px
-import plotly.graph_objects as go
-
+from streamlit_lottie import st_lottie
 
 API_KEY = os.getenv("API_KEY")
 
@@ -32,7 +31,6 @@ def get_weather_data(location):
     lon = data['city']['coord']['lon']
 
     weather_list = []
-
     for entry in data['list']:
         weather_list.append({
             "Datetime": entry['dt_txt'],
@@ -47,7 +45,7 @@ def get_weather_data(location):
 
     return df, lat, lon
 
-
+# Summary
 def daily_summary(df):
     df['Date'] = df['Datetime'].dt.date
     summary = df.groupby('Date').agg({
@@ -57,14 +55,61 @@ def daily_summary(df):
     summary.columns = ['Min Temp', 'Max Temp', 'Avg Temp', 'Total Rain']
     return summary.reset_index()
 
-
+# Excel
 def convert_to_excel(df):
     output = BytesIO()
     df.to_excel(output, index=False, engine='openpyxl')
     output.seek(0)
     return output
 
+# Emoji
+def get_weather_emoji(desc):
+    desc = desc.lower()
+    if "rain" in desc: return "🌧"
+    elif "cloud" in desc: return "☁"
+    elif "clear" in desc: return "☀"
+    elif "storm" in desc: return "⛈"
+    else: return "🌤"
 
+# Theme
+def get_theme(desc, hour):
+    desc = desc.lower()
+    is_night = hour >= 18 or hour <= 6
+
+    if "rain" in desc:
+        gradient = "#00c6ff, #0072ff"
+        card = "rgba(0,114,255,0.2)"
+    elif "cloud" in desc:
+        gradient = "#757f9a, #d7dde8"
+        card = "rgba(120,120,120,0.2)"
+    elif "clear" in desc:
+        gradient = "#f7971e, #ffd200"
+        card = "rgba(255,200,0,0.2)"
+    else:
+        gradient = "#4facfe, #00f2fe"
+        card = "rgba(0,200,255,0.2)"
+
+    if is_night:
+        gradient = "#141E30, #243B55"
+        card = "rgba(20,30,50,0.5)"
+
+    return gradient, card
+
+# Lottie loader
+def load_lottie_url(url):
+    r = requests.get(url)
+    return r.json() if r.status_code == 200 else None
+
+def get_lottie_animation(desc):
+    desc = desc.lower()
+    if "rain" in desc:
+        return load_lottie_url("https://assets2.lottiefiles.com/packages/lf20_jmBauI.json")
+    elif "cloud" in desc:
+        return load_lottie_url("https://assets2.lottiefiles.com/packages/lf20_KUFdS6.json")
+    else:
+        return load_lottie_url("https://assets2.lottiefiles.com/packages/lf20_Stt1Rk.json")
+
+#  Multi-city coords
 def get_city_coords(city):
     url = f"http://api.openweathermap.org/geo/1.0/direct?q={city}&limit=1&appid={API_KEY}"
     res = requests.get(url).json()
@@ -72,137 +117,110 @@ def get_city_coords(city):
         return None, None
     return res[0]['lat'], res[0]['lon']
 
-
-st.markdown("<h1 style='text-align:center;'> Weather Intelligence Dashboard</h1>", unsafe_allow_html=True)
-
+# ================= UI =================
 
 auto_location = get_location()
 
 st.sidebar.title("⚙ Control Panel")
-location = st.sidebar.text_input("City", auto_location)
+location = st.sidebar.text_input(" City", auto_location)
 view = st.sidebar.radio("View", ["Overview", "Trends", "Raw Data"])
 
-multi_cities = st.sidebar.text_input(
-    "Compare Cities",
-    "Bangalore, Mumbai, Delhi"
-)
+multi_cities = st.sidebar.text_input(" Compare Cities", "Bangalore, Mumbai, Delhi")
 
+# ================= MAIN =================
 
 if st.sidebar.button("Get Weather"):
 
     df, lat, lon = get_weather_data(location)
-
     if df.empty:
         st.stop()
 
     summary = daily_summary(df)
 
-    
+    current_temp = df['Temp'].iloc[0]
+    current_weather = df['Weather'].iloc[0]
+    emoji = get_weather_emoji(current_weather)
+
+    hour = pd.Timestamp.now().hour
+    gradient, card_color = get_theme(current_weather, hour)
+
+    # Animated Header
+    st.markdown(f"""
+    <style>
+    .header {{
+        text-align:center;
+        font-size:42px;
+        font-weight:bold;
+        background: linear-gradient(270deg, {gradient});
+        background-size:400% 400%;
+        -webkit-background-clip:text;
+        color:transparent;
+        animation: move 6s infinite;
+    }}
+    @keyframes move {{
+        0%{{background-position:0%}}
+        50%{{background-position:100%}}
+        100%{{background-position:0%}}
+    }}
+    </style>
+    <div class="header">
+    {emoji} {location} | {current_temp:.1f}°C — {current_weather.title()}
+    </div>
+    """, unsafe_allow_html=True)
+
+    # 🎥 Animation
+    st_lottie(get_lottie_animation(current_weather), height=150)
+
+    #  Cards
     col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Avg Temp", f"{df['Temp'].mean():.1f}°C")
-    col2.metric("Max Temp", f"{df['Temp'].max():.1f}°C")
-    col3.metric("Min Temp", f"{df['Temp'].min():.1f}°C")
-    col4.metric("Rain", f"{df['Rain (mm)'].sum():.1f} mm")
 
-    # =========================
-    # LIVE RADAR
-    # =========================
-    st.markdown("### Live Rain Radar")
+    def card(title, value):
+        return f"""
+        <div style="background:{card_color};padding:20px;border-radius:15px;text-align:center;">
+        <h4>{title}</h4><h2>{value}</h2></div>
+        """
 
+    col1.markdown(card("Avg Temp", f"{df['Temp'].mean():.1f}°C"), True)
+    col2.markdown(card("Max Temp", f"{df['Temp'].max():.1f}°C"), True)
+    col3.markdown(card("Min Temp", f"{df['Temp'].min():.1f}°C"), True)
+    col4.markdown(card("Rain", f"{df['Rain (mm)'].sum():.1f} mm"), True)
+
+    # 🌧 Radar
     tile_url = f"https://tile.openweathermap.org/map/precipitation_new/{{z}}/{{x}}/{{y}}.png?appid={API_KEY}"
 
     st.components.v1.html(f"""
-        <div id="map" style="height: 500px;"></div>
+    <div id="map" style="height:400px;"></div>
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+    <script>
+    var map = L.map('map').setView([{lat}, {lon}], 6);
+    L.tileLayer('https://tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png').addTo(map);
+    L.tileLayer('{tile_url}', {{opacity:0.6}}).addTo(map);
+    </script>
+    """, height=420)
 
-        <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
-        <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-
-        <script>
-            var map = L.map('map').setView([{lat}, {lon}], 6);
-
-            L.tileLayer('https://tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png').addTo(map);
-
-            L.tileLayer('{tile_url}', {{
-                opacity: 0.6
-            }}).addTo(map);
-        </script>
-    """, height=520)
-
-    # =========================
-    # MULTI CITY MAP
-    # =========================
-    st.markdown("### Multi-City Comparison")
-
+    # Multi-city
     cities = [c.strip() for c in multi_cities.split(",")]
-    map_data = []
+    data = []
+    for c in cities:
+        la, lo = get_city_coords(c)
+        if la:
+            temp = get_weather_data(c)[0]['Temp'].iloc[0]
+            data.append({"City": c, "lat": la, "lon": lo, "Temp": temp})
 
-    for city in cities:
-        lat_c, lon_c = get_city_coords(city)
-        if lat_c:
-            temp = get_weather_data(city)[0]['Temp'].iloc[0]
-            map_data.append({
-                "City": city,
-                "lat": lat_c,
-                "lon": lon_c,
-                "Temp": temp
-            })
-
-    multi_df = pd.DataFrame(map_data)
-
-    if not multi_df.empty:
-        fig = px.scatter_mapbox(
-            multi_df,
-            lat="lat",
-            lon="lon",
-            size="Temp",
-            color="Temp",
-            hover_name="City",
-            zoom=3
-        )
+    mdf = pd.DataFrame(data)
+    if not mdf.empty:
+        fig = px.scatter_mapbox(mdf, lat="lat", lon="lon", size="Temp", color="Temp", hover_name="City")
         fig.update_layout(mapbox_style="open-street-map")
         st.plotly_chart(fig, use_container_width=True)
 
-    # =========================
-    #  AI ASSISTANT
-    # =========================
-    st.markdown("### AI Weather Assistant")
-
-    user_question = st.text_input("Ask: Should I go out / workout?")
-
-    def ai_response(df):
-        avg_temp = df['Temp'].mean()
-        rain = df['Rain (mm)'].sum()
-
-        if rain > 5:
-            return " Heavy rain expected. Avoid outdoor plans."
-        elif avg_temp > 35:
-            return " Too hot. Best to stay indoors or go out early morning."
-        elif avg_temp < 20:
-            return " Cool weather. Great for workouts!"
-        else:
-            return " Weather looks perfect for outdoor activities."
-
-    if user_question:
-        st.success(ai_response(df))
-
-    # =========================
-    # VIEWS
-    # =========================
+    #  Views
     if view == "Overview":
-        st.dataframe(summary, use_container_width=True)
-
+        st.dataframe(summary)
     elif view == "Trends":
-        fig = px.line(df, x="Datetime", y="Temp", markers=True)
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(px.line(df, x="Datetime", y="Temp", markers=True))
+    else:
+        st.dataframe(df)
 
-    elif view == "Raw Data":
-        st.dataframe(df, use_container_width=True)
-
-    # DOWNLOAD
-    excel = convert_to_excel(summary)
-
-    st.download_button(
-        "⬇ Download Excel",
-        data=excel,
-        file_name="weather_report.xlsx"
-    )
+    # Download
+    st.download_button("Download Excel", convert_to_excel(summary), "weather.xlsx")
