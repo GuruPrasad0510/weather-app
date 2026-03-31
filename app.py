@@ -10,7 +10,7 @@ API_KEY = os.getenv("API_KEY")
 
 st.set_page_config(page_title="Weather Intelligence", layout="wide")
 
-
+# 🌍 Auto location
 def get_location():
     try:
         res = requests.get("http://ip-api.com/json/").json()
@@ -18,34 +18,37 @@ def get_location():
     except:
         return "Bangalore"
 
-
+# 🌦 Weather Data
 def get_weather_data(location):
-    url = f"https://api.openweathermap.org/data/2.5/forecast?q={location}&appid={API_KEY}&units=metric"
-    data = requests.get(url).json()
+    try:
+        url = f"https://api.openweathermap.org/data/2.5/forecast?q={location}&appid={API_KEY}&units=metric"
+        data = requests.get(url).json()
 
-    if data.get("cod") != "200":
-        st.error(f"Error: {data.get('message')}")
+        if data.get("cod") != "200":
+            return pd.DataFrame(), None, None
+
+        lat = data['city']['coord']['lat']
+        lon = data['city']['coord']['lon']
+
+        weather_list = []
+        for entry in data['list']:
+            weather_list.append({
+                "Datetime": entry['dt_txt'],
+                "Temp": entry['main']['temp'],
+                "Humidity": entry['main']['humidity'],
+                "Rain (mm)": entry.get('rain', {}).get('3h', 0),
+                "Weather": entry['weather'][0]['description']
+            })
+
+        df = pd.DataFrame(weather_list)
+        df['Datetime'] = pd.to_datetime(df['Datetime'])
+
+        return df, lat, lon
+
+    except:
         return pd.DataFrame(), None, None
 
-    lat = data['city']['coord']['lat']
-    lon = data['city']['coord']['lon']
-
-    weather_list = []
-    for entry in data['list']:
-        weather_list.append({
-            "Datetime": entry['dt_txt'],
-            "Temp": entry['main']['temp'],
-            "Humidity": entry['main']['humidity'],
-            "Rain (mm)": entry.get('rain', {}).get('3h', 0),
-            "Weather": entry['weather'][0]['description']
-        })
-
-    df = pd.DataFrame(weather_list)
-    df['Datetime'] = pd.to_datetime(df['Datetime'])
-
-    return df, lat, lon
-
-# Summary
+# 📅 Summary
 def daily_summary(df):
     df['Date'] = df['Datetime'].dt.date
     summary = df.groupby('Date').agg({
@@ -55,14 +58,14 @@ def daily_summary(df):
     summary.columns = ['Min Temp', 'Max Temp', 'Avg Temp', 'Total Rain']
     return summary.reset_index()
 
-# Excel
+# 📥 Excel
 def convert_to_excel(df):
     output = BytesIO()
     df.to_excel(output, index=False, engine='openpyxl')
     output.seek(0)
     return output
 
-# Emoji
+# 🌤 Emoji
 def get_weather_emoji(desc):
     desc = desc.lower()
     if "rain" in desc: return "🌧"
@@ -71,7 +74,7 @@ def get_weather_emoji(desc):
     elif "storm" in desc: return "⛈"
     else: return "🌤"
 
-# Theme
+# 🎨 Theme
 def get_theme(desc, hour):
     desc = desc.lower()
     is_night = hour >= 18 or hour <= 6
@@ -95,7 +98,7 @@ def get_theme(desc, hour):
 
     return gradient, card
 
-# Lottie loader
+# 🎥 Lottie
 def load_lottie_url(url):
     r = requests.get(url)
     return r.json() if r.status_code == 200 else None
@@ -109,30 +112,37 @@ def get_lottie_animation(desc):
     else:
         return load_lottie_url("https://assets2.lottiefiles.com/packages/lf20_Stt1Rk.json")
 
-#  Multi-city coords
+# 🌍 SAFE GEO FUNCTION (FIXED)
 def get_city_coords(city):
-    url = f"http://api.openweathermap.org/geo/1.0/direct?q={city}&limit=1&appid={API_KEY}"
-    res = requests.get(url).json()
-    if len(res) == 0:
+    try:
+        url = f"http://api.openweathermap.org/geo/1.0/direct?q={city}&limit=1&appid={API_KEY}"
+        res = requests.get(url).json()
+
+        if not res:
+            return None, None
+
+        return res[0].get('lat'), res[0].get('lon')
+
+    except:
         return None, None
-    return res[0]['lat'], res[0]['lon']
 
 # ================= UI =================
 
 auto_location = get_location()
 
 st.sidebar.title("⚙ Control Panel")
-location = st.sidebar.text_input(" City", auto_location)
-view = st.sidebar.radio("View", ["Overview", "Trends", "Raw Data"])
-
-multi_cities = st.sidebar.text_input(" Compare Cities", "Bangalore, Mumbai, Delhi")
+location = st.sidebar.text_input("📍 City", auto_location)
+view = st.sidebar.radio("📊 View", ["Overview", "Trends", "Raw Data"])
+multi_cities = st.sidebar.text_input("🌍 Compare Cities", "Bangalore, Mumbai, Delhi")
 
 # ================= MAIN =================
 
 if st.sidebar.button("Get Weather"):
 
     df, lat, lon = get_weather_data(location)
+
     if df.empty:
+        st.error("Invalid city or API issue")
         st.stop()
 
     summary = daily_summary(df)
@@ -144,7 +154,7 @@ if st.sidebar.button("Get Weather"):
     hour = pd.Timestamp.now().hour
     gradient, card_color = get_theme(current_weather, hour)
 
-    # Animated Header
+    # 🌈 Animated Header
     st.markdown(f"""
     <style>
     .header {{
@@ -171,7 +181,7 @@ if st.sidebar.button("Get Weather"):
     # 🎥 Animation
     st_lottie(get_lottie_animation(current_weather), height=150)
 
-    #  Cards
+    # 🧊 Cards
     col1, col2, col3, col4 = st.columns(4)
 
     def card(title, value):
@@ -199,22 +209,38 @@ if st.sidebar.button("Get Weather"):
     </script>
     """, height=420)
 
-    # Multi-city
+    # 🌍 Multi-city (SAFE)
     cities = [c.strip() for c in multi_cities.split(",")]
     data = []
+
     for c in cities:
         la, lo = get_city_coords(c)
-        if la:
-            temp = get_weather_data(c)[0]['Temp'].iloc[0]
-            data.append({"City": c, "lat": la, "lon": lo, "Temp": temp})
+
+        if la is None:
+            continue
+
+        temp_df, _, _ = get_weather_data(c)
+
+        if temp_df.empty:
+            continue
+
+        temp = temp_df['Temp'].iloc[0]
+
+        data.append({
+            "City": c,
+            "lat": la,
+            "lon": lo,
+            "Temp": temp
+        })
 
     mdf = pd.DataFrame(data)
+
     if not mdf.empty:
         fig = px.scatter_mapbox(mdf, lat="lat", lon="lon", size="Temp", color="Temp", hover_name="City")
         fig.update_layout(mapbox_style="open-street-map")
         st.plotly_chart(fig, use_container_width=True)
 
-    #  Views
+    # 📊 Views
     if view == "Overview":
         st.dataframe(summary)
     elif view == "Trends":
@@ -222,5 +248,5 @@ if st.sidebar.button("Get Weather"):
     else:
         st.dataframe(df)
 
-    # Download
+    # 📥 Download
     st.download_button("Download Excel", convert_to_excel(summary), "weather.xlsx")
